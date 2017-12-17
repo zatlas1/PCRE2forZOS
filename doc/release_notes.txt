@@ -1,0 +1,57 @@
+Release Notes
+-------------
+This is an interim release.
+While PCRE2 has not changed and it is still in 10.30, there was a lot
+of activity in the z/OS side.
+1. We have come to realize that the way PCRE2 for z/OS was set up would
+   fail miserably in international context where the EBCDIC code page 
+   is not IBM-1047.  We've added some API functions to handle such
+   situations.
+2. The Rexx interface is now complete and allow Rexx users a standard
+   and convinient API to use regular expressions, including a standard 
+   stem structure for the results.  This interface takes the 
+   aformentioned code page issue into account and deals with it in
+   almost transparent way.
+3. We now take compatibility issues into account and compile the C and
+   assembler in fairly low hardware level.
+   
+The original documentation that was always supplied with the paqckage 
+does not yet take all the above into account.  Instead there are two 
+additional documents that cover these issues in detail.  I pledge to
+try to bring the documentation in line with the software by the next
+PCRE2 release.
+
+A lot of thanks to John Gateley who worked on the Rexx interface and 
+incorporated the dealing with code pages in it.   
+
+Machine and z/OS compatibility
+------------------------------
+As I became more aware about compatibility issues, the distributed
+library would be catered to somewhat older combination of hardware and
+OS, older than the current IBM latest.  Since the distribution contains
+the source code and JCL, one could compile for the latest and greatest
+or conversly for an older combination, if one posses a license for the 
+IBM C/C++ compiler.
+
+One may tell the C/C++ compiler both the minimum supported hardware and 
+the most typical hardware used. So the compiler uses only instructions 
+available on that minimum hardware and optimizes with instructions that 
+work best on the typical hardware.  Based on my z/OS 2.2 installation 
+default, I chose ARCH(8) TUNE(8) however, there should not be a problem 
+to go down to ARCH(7) TUNE(7) or up to current level (on my 2.3 system
+the default is already TUNE(10) ARCH(10).)
+
+The assembler parts are assembled and work fine in ZS-4.  According to 
+John, we may, if required, get it down to ZS-1 as there are only three 
+instructions that need the higher level (MVHHI, CFI and CLHHSI) and they 
+are relatively easy to replace.
+
+(The C ARCH numbers are two behind the marketing numbers: a z13 is 
+ARCH(11). The HLASM MACHINE numbers are four behind: a z13 is ZS-9.)
+
+One may also tell the C/C++ compiler and the binder the minimum level 
+of LE to target. Based on the aforementioned instalation we tell the 
+compiler TARG(LE,current) but we can go down to something like 
+zOSV1R13, or whatever.
+
+

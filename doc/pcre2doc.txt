@@ -1,0 +1,1059 @@
+PCRE2 Native z/OS Port
+----------------------
+Copyright © 2012, 2013, 2014, 2015, 2016, 2017 Ze'ev Atlas
+Version 10.30, September 2017.
+
+PCRE2 version 10.30 2017-08-14          
+Compiled with                           
+  EBCDIC code support: LF is 0x15       
+  EBCDIC code page IBM1140 or similar   
+  8-bit support                         
+  No Unicode support                    
+  No just-in-time compiler support      
+  Newline sequence is LF                
+  \R matches CR, LF, or CRLF only       
+  \C is supported                       
+  Internal link size = 2                
+  Parentheses nest limit = 250          
+  Default heap limit = 20000000         
+  Default match limit = 10000000        
+  Default depth limit = 10000000                            
+
+Waht's new
+----------
+10.30
+1. The main interpreter, pcre2_match(), has been refactored into a 
+   new version that does not use recursive function calls (and 
+   therefore the stack) for remembering backtracking positions. 
+   This makes --disable-stack-for-recursion a NOOP. The new 
+   implementation allows backtracking into recursive group calls in
+   patterns, making it more compatible with Perl, and also fixes some 
+   other hard-to-do issues such as #1887 in Bugzilla. The code is 
+   also cleaner because the old code had a number of fudges to try to 
+   reduce stack usage. It seems to run no slower than the old code.
+2. Rexx API
+   There are some enhancements to the STEM manipulation in PCREREXX.
+   Here are the modules needed for the Rexx API:
+   
+   PCRE2.ASM(REXXPCRE)	- Assembler module    
+   PCRE2.ASM(STRINGIT)	- Assembler module      
+   C14.MACLIB(TRIMIT)	- Assembler module        
+   PCRE2.ASM(PROCSTEM)	- Assembler module      
+   PCRE2.SRCE(PCOBAPI2)- c, part of the library   
+   PCRE2.SRCE(PCRZFUNC)- c, part of the library     
+   
+   A new program PROCSTEM contains all the STEM manipulation code and 
+   uses the new macro PRGSTEM defines the shared storage. REXXPCRE 
+   now calls PROCSTEM to do the STEM work which makes REXXPPCRE a bit 
+   simpler and means that any other Assembler REXX functions can 
+   easily use STEM functions.
+   
+   Remember that the Rexx API provide access to the main functionality
+   of PCRE2 (i.e. pattern matching) but it hides all the gorry details
+   and thus do not give access to all the library flexibility and 
+   options.  Also, by not persisting the environment (it does not use 
+   CEEPIPI), usage of the library for heavy load could be expensive as
+   every call repeatrs the pattern compile process.
+
+3. I have not yet developed PL/I 'include' modules aimilar to the 
+   available COBOL copybooks.  Being that C is an LE language, the
+   library functions could be called from PL/I.  What is not provided
+   are the structures used by the functions and the equivalent of the
+   pcre2.h header.
+
+10.23
+1. Release 10.23 added a couple of new API functions, bugfixes and 
+   tidying up of some functions.  Please refer to the original 
+   documentation for detailed overview.
+2. A couple of API functions that were missing are now accounted for.
+3. The most exciting change for this port is Rexx support.
+   Rexx API has been provided by John Gateley.
+   Due to the differences between Rexx and LE languages, the Rexx API
+   does not expose all the PCRE2 library functionality.  Instead it is
+   a functional API in which one may call a function, provide the 
+   pattern and a target string with a couple of options.
+   The result match substrings are provided in a normal Rexx stem.
+   Obviously, not all the esoteric options (like partial match, etc.) 
+   are available.  Also there is inherent inefficiency in that a 
+   compiled pattern may not persist between calls (doing so would 
+   require using the dreaded CEEPIPI.)
+   Please read elsewhere in the accompanied document, how to use the 
+   Rexx API.
+  
+Preamble. License
+-----------------
+The software described herein is a direct port of the open source PCRE2 
+package to a new platform (i.e. z/OS) and thus is distributed under the 
+same BSD license with the addition of my name as a contributor.  This 
+license covers each and every file in this package, including this 
+document.
+ 
+The original PCRE package was contributed by the various contributors 
+mentioned in the LICENCE document.  Please refer to the document named 
+LICENCE in the original package for details about the various 
+contributors and their corresponding copyrights.  Please refer to the
+document named LICENCE in the JCLLIB to see my specific copyright.
+
+Copyright © 1997 – 2017
+
+THE z/OS specific modifications
+-------------------------------
+
+Contributed by:  Ze'ev Atlas.
+
+Copyright © 2012, 2013, 2014, 2015, 2016, 2017 Ze'ev Atlas
+All rights reserved.
+
+THE z/VM and PL/I support have been dropped.  You may refer to them 
+and the associated copyright in previous distributions 
+
+THE "BSD" LICENCE                                                        
+-----------------                                                        
+Redistribution and use in source and binary forms, with or without       
+modification, are permitted provided that the following conditions are
+met:     
+                                                                           
+    * Redistributions of source code must retain the above copyright     
+      notice, this list of conditions and the following disclaimer.      
+                                                                           
+    * Redistributions in binary form must reproduce the above copyright  
+      notice, this list of conditions and the following disclaimer in       
+      the documentation and/or other materials provided with the 
+      distribution.      
+                                                                          
+    * Neither the name of the University of Cambridge nor the name of     
+      Google Inc. nor the names of their contributors may be used to         
+      endorse or promote products derived from this software without         
+      specific prior written permission.                                
+                                                                                
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS      
+"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT        
+LIMITED TO, THEIMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A       
+PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT        
+OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,    
+SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT             
+LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,         
+DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY        
+THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT          
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE 
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+-----------------------------------------------------------------------      
+
+!!! ALERT - z/OS and EBCDIC annoyance factors !!!
+-------------------------------------------------
+There are few issues that I've coined as z/OS annoyance factors that 
+must not be ignored.  Here is an enumeration of the main known issues.
+1. The original EBCDIC did not have the Circumflex (or Caret) ('^') 
+   character.  This character was later introduced but was moved 
+   around.  The C compiler assumes the IBM-1047 version of EBCDIC where 
+   X'B0' is the logical not ('¬') and X'5F' is the circumflex , but 
+   most installations in the USA use the IBM-037 where the inverse is  
+   correct.  This hold over from a bygone era is with us to stay.  The 
+   problem is that this affects not only the compiler but the patterns 
+   that are the input to the PCRE2 library under z/OS as well.  
+   EXPLICITLY: For any pattern that requires circumflex under any other 
+   OS, you MUST use the Logical Not when your installation uses 
+   IBM-037.
+   Example:
+   /^[^A]/ that should match any line that starts with any character 
+   but 'A', would be /¬[¬A]/ in the z/OS IBM-037 implementation.
+2. The Tab character (X'05') causes the C compiler to fail.  I do not 
+   know which character to use instead, so I replaced all Tabs with 
+   Spaces in the source code.  This should not affect patterns as we 
+   rarely deal with Tab character as is.  I believe that it is 
+   recognized as white space as it should, but farther testing is 
+   needed.
+3. The character y umlaut (officially known in Unicode as 'Latin small 
+   letter y with diaeresis' and looks like y with two dots above it, is 
+   mapped to X'FF' in ASCII.  X'FF' in EBCDIC is EO (i.e. EOT End of 
+   Transmission).  This may and would, cause issues when uploading 
+   ASCII files that contain that character to the mainframe.
+4. When entering pattern via the PARM in the JCL, please remember that 
+   any Back Slash character must be doubled.  This is a requirement of 
+   the C compiler as far as I can tell.  Surprisingly, this annoyance 
+   factor is not unique to z/OS but may be seen in the Unix/Linux 
+   environment as well.
+   Example:
+   to run pcredemo to find all digits in the input string, one must code:
+   //STEP1 EXEC PGM=PCRE2DEM,PARM='-g \\d 123'
+   and not
+   //STEP1 EXEC PGM=PCRE2DEM,PARM='-g \d 123'
+5. As PCRE2 for z/OS is geared for EBCDIC, none of the real important 
+   new developments in PCRE are supported.  The user is encouraged to 
+   work with PCRE2 in other platforms were he or she could use the full 
+   support for UTF-8, UTF-16 and UTF-32.
+   
+Roadmap:
+1. GREP functionality is not yet fully tested (see GREP discussion for 
+   details.) 
+2. The old PCRE is now stuck in 8.39.  I will not maintain the old PCRE 
+   any more.   
+3. I am actively working again on PL/I API.
+
+0. Documentation
+----------------
+This document attempts to explain the port of PCRE2 10.20 into z/OS, 
+including installation.  It does not attempt to be a full documentation 
+of PCRE2 as PCRE2 is fully documented.  See 
+http://www.pcre.org/current/doc/html/ or http://www.pcre.org/pcre2.txt 
+for full documentation in html or text forms.
+The previous incarnation of the PCRE2 library was called PCRE.  I 
+ported the 8.xx series to z/OS in similar manner and that port is still
+available separately.  The old PCRE and its port to z/OS are on 
+maintenance mode and it is recommendecd NOT to use them for any new 
+development.  Instead, use this current incarnation, PCRE2 and its 
+port.
+
+1. Rationale
+------------
+The purpose of this port is to bring Perl-style Regular Expressions 
+into the mainframe world.  PCRE2 - Perl Compatible Regular Expressions
+[http://www.pcre.org/] is a mature and quite popular open source 
+package that provides this functionality.
+The intended use of this package would be by traditional mainframe 
+programmers using traditional mainframe languages such as COBOL within 
+the native z/OS framework and file system without the need to use USS.
+The intended audience of this port are people who are working on the 
+classic native z/OS with LE languages, mainly COBOL.  Those people, if 
+they at all have permission to load open source, would be bound to 
+compile it using JCL inside the classic native z/OS environment, 
+potentially with Sysprog mandated (i.e. written on stone) compile 
+options.  They may not even have access to any C compiler.  Their 
+target language (usually COBOL) uses LE and does not consider it to be 
+a bloat.  In short, my audience is the poor souls who maintain the 
+legacy code and would never care for the glory of the new brave world.
+Note that z/OS C provides the standard Posix compliant Regular 
+Expression functions that could be used as is. However, PCRE2 provides
+for the more robust Perl compatibility.
+
+2. Limitations of the z/OS Port and of the current Release
+----------------------------------------------------------
+* The current release intends to provide the use of the core PCRE2 
+  functionality in native z/OS environment, using the available API in 
+  C.
+* In addition, this version provides a COBOL API that allows calling 
+  the various functionalities using traditional z/OS short (and 
+  uppercase) names.
+* It was compiled and tested under EBCDIC codepage IBM-037 only.
+* We rely on the standard IBM C and not on the Gnu C (GCC).  GCC 
+  availability on z/OS is not clear.  And I do not have the expertise 
+  to even try to install it, let alone use it.
+* Work on PL/I support is in progress but because of some personal 
+  issues was not completed for this release.
+* Rexx is now supported via an Assembler module that was supplied by
+  John Gateley.  It is limitted in nature by not providing the use of
+  the whole API and by not persisting the environment, but it is a
+  great start, and is suitable for light usage.
+* It does not support C++!
+* Also, it does not, and the port will not support JIT!
+* This port is strictly EBCDIC (IBM-037), to the exclusion of ASCII, 
+  UTF (all of them), any IBM DBCS, and any other character set one may 
+  imagine!  This limitation is built in and the port will never support
+  any of the aforementioned character sets.
+* The documentation is still somewhat sparse and leave a lot to be 
+  desired :)
+* Special warning about the Posix compliant module of PCRE2:
+  IBM supplies Posix compliant functions that share the same names of 
+  the Posix compliant functions in PCRE2.  To prevent any conflict I 
+  changed the names of the PCRE2 functions.  However, C programmers are 
+  advised to use either the IBM native Posix functions or the PCRE2 
+  equivalents and never mix them in the same program.  Specifically, if 
+  you intend to use the PCRE2 functions then do not issue 
+  #include <regex.h>.
+* The provided LE API (PCOBAPI2.C module) would normaly compile without   
+  support to the native IBM supplied POSIX and any call to the PCRE2     
+  specific POSIX routine names will refer to PCRE2.  
+  Support for compiling PCOBAPI2.C with the directive                       
+  #define  NATIVE_ZOS_POSIX   
+  has been dropped since PCRE2 10.22.  
+  (It was supposed to mask the PCRE2 names and cause the program to use 
+  the native POSIX routines: regcomp, regexec, regerror and regfree.)      
+* All API functions are now supported including some that were 
+  mistakenly missing in previous release.
+  
+3. Porting Process
+------------------
+The porting is done by Perl scripts that automatically handle most 
+issues:
+1. Source module names changed in controlled manner to reflect z/OS' 8
+   character member name limitation.  (some names were later tweaked 
+   manually)
+2. All #include changed to refer to the above transformed names.
+3. All references to external module source names are resolved by using
+   automatically created #pragma directive statements (i.e. internal 
+   calls for long names functions have NOT been changed.)
+4. Internal long function names were automatically resolved in linkage 
+   time without the need for such #pragma directives. 
+5. For all internal function names, there are also traditional z/OS 
+   aliases (8 character upper case) provided via dedicated COBOL API 
+   module.
+6. All fopen are changed to avoid binary files (i.e. "r" or "w" instead 
+   of "wb" or "rb".
+7. The character y umlaut (officially known in Unicode as 'Latin small 
+   letter y with diaeresis' and looks like y with two dots above it is 
+   changed to \xFF to prevent z/OS' FTP failure.  [The character is 
+   ASCII \xFF and is understood by the mainframe's file load as sort of 
+   EOT or EOF.  I am not sure about the official reason, but the bottom 
+   line is that the transmission is cut.  This document is basically an 
+   ASCII document, but since it is uploaded to the mainframe into the 
+   JCLLIB, I refrained from putting the actual character in this 
+   document.]
+8. The character ^ (caret) is changed to ¬ because the C compiler 
+   assumes IBM-1047 while most installations are IBM-037.
+9. all \t changed to 4 spaces as the mainframe C compiler does not like 
+   tabs in the source code.
+10. Some code is added to enforce usage of config.h.  The supplied z/OS
+   compatible config.h was manually adjusted.  One important definition 
+   in that config.h is the line
+   #define NATIVE_ZOS 1
+   which is used to recognize the z/OS environment.  However, there are
+   other required #define statements which are introduced via compile
+   time option file.  The difference is that those #define are not z/OS
+   specific and could be used in other contexts as well.
+11. All C #include files are (at least for now) considered local.  
+   Therefore #include <pcre2.h> is changed to #include "PCRE2.H". 
+12. In addition to the core PCRE2 modules, this package provides 4 
+   additional modules:
+12.1. pcrzfunc.c provides some text manipulation functions to deal with 
+   null terminated and non-null terminated strings in the mixed C/COBOL 
+   environment.  While the Enterprise COBOL supports PIC Z character 
+   strings which are essentially null terminated strings, most 
+   traditional COBOL programs use the old, fixed length PIC X strings.  
+   The functions herein come to help you manipulate such strings.
+12.2. pcobapi2.c provides the COBOL API.
+12.3. pcrzosfs.h is used internally by the pcre2grep utility to handle 
+   PDS files like directories.
+12.4. pcrzoscs.h is used internally by the pcre2test utility to 
+   approximate the EBCDIC code page.
+13. The package includes a port of the demo program pcre2demo.c into 
+   COBOL as PCOBDEM2 and a library of necessary copybooks, some are 
+   ports of the native PCRE2 header files and some are new copybooks 
+   providing well defined structures to handle various aspects of the 
+   API in more bearable way then what is provided by C.
+   
+4. Available Files
+------------------
+1. ADDJCL.JCL   - JCL to load the JCL, ADDMEM
+2. ADDMEM.REX   - a Rexx utility to load VB members to VB source 
+   library
+3. zos.jcl.txt  - the supplied installation JCL
+4. zos.load.txt - the supplied source code
+5. zos.lked.txt - the supplied Binder parameters and Rexx modules.
+6. zos.test.txt - the supplied test suite
+7. zos.cob.txt  - the supplied COBOL components
+8. zos.asm.txt  - assembler modules for Rexx support
+9. C14_MACRO.ieb - assembler macro needed for #8
+10. pcre2doc.jcl - this file
+Note that the LICENCE file is available as part of the JCLLIB as well 
+as a copy of pcre2doc.jcl
+11. XMI files representing the various z/OS side installed libraries
+   corresponding to the files above.  The XMI libraries are in EBCDIC 
+   and should be uploaded in binary mode.
+* PCRE2.CNTLLIB.XMI
+* PCRE2.COB.XMI
+* PCRE2.JCLLIB.XMI
+* PCRE2.LOADLIB.XMI
+* PCRE2.SRCE.XMI
+* PCRE2.TESTLIB.XMI
+* PCRE2.ASM.XMI
+* PCRE2.C14.MACLIB.XMI - strictly speaking this is not a part of the 
+  port, but a set of macros from John Gateley that are available 
+  elsewere.  It is supplied here because it is necessary for compiling
+  the assembler for Rexx support.
+12. LICENCE.ebc  - License file in EBCDIC.
+13. PCRE2DOC.ebc - This documant in EBCDIC.
+Note that the distribution on the CBTTAPE site (www.cbttape.org) 
+contains only the files mentioned in #11 through #13 as it is EBCDIC
+only distribution.
+
+5. installation:
+----------------
+0. You may use the supplied XMIT libraries and save the installation 
+   process if you are on IBM-037 codepage.
+1. create libraries:
+Use your own high level qualifier instead of HLQ
+HLQ.PCRE2.CNTLLIB - regular source library - LRECL=80,RECFM=FB; caps 
+   off
+HLQ.PCRE2.JCLLIB  - regular source library - LRECL=80,RECFM=FB; caps 
+   off
+HLQ.PCRE2.LOADLIB - load module library, must be a PDSE - 
+   BLKSIZE=27998,RECFM=U
+HLQ.PCRE2.SRCE    - source library - but LRECL=255,RECFM=VB; caps off
+HLQ.PCRE2.TESTLIB - source library - but LRECL=4096,RECFM=VB; caps 
+   off
+HLQ.PCRE2.COB     - PDSE library - LRECL=80,RECFM=FB; caps off
+HLQ.PCRE2.ASM     - regular source library - LRECL=80,RECFM=FB; caps 
+   off
+HLQ.C14.MACLIB    - regular source library - LRECL=80,RECFM=FB; caps 
+   off
+
+Optional HLQ.PCRE2.SYSOUT  - a library to store test results -
+                  - LRECL=133,RECFM=FBA
+Optional HLQ.PCRE2.STDOUT  - a library to store test results -
+                  - LRECL=31000,RECFM=VB				  
+
+Here is the relevant allocation sizes information on my system
+                                          Tracks %Used
+------------------------------------------------------
+HLQ.C14.MACLIB                                15   46
+HLQ.PCRE2.ASM                                  5   60
+HLQ.PCRE2.CNTLLIB                              4   50
+HLQ.PCRE2.COB                                  8   53
+HLQ.PCRE2.JCLLIB                               7   71
+HLQ.PCRE2.LOADLIB                            224   33
+HLQ.PCRE2.SRCE                                65   78
+HLQ.PCRE2.SYSOUT                             450   53
+HLQ.PCRE2.TESTLIB                             19    5
+------
+The member ALLOCPDS in the HLQ.PCRE2.JCLLIB is a sample of how to 
+create those libraries in batch, but using ISPF 3.2 works as well.
+2. Load all files starting with zos, ADDJCL.JCL and addmem.rex to the 
+   mainframe.  My convention, reflected in the JCL, is to drop the txt 
+   suffix, so, for example, zos.jcl.txt will become HLQ.ZOS.JCL.
+   Important: 
+   addmem.rex, addjcl.jcl, zos.jcl.txt, zos.cob.txt, and zos.lked.txt 
+   should be uploaded with attributes LRECL 80, FB; 
+   zos.load.txt should to be uploaded with attributes LRECL 255, VB;
+   zos.test.txt should be uploaded with attributes LRECL 4014, VB;
+3. Use the ADDJCL.JCL IEBUPDTE job in this package to load the 
+   HLQ.ZOS.JCL to the HLQ.PCRE2.JCLLIB and the HLQ.ADDMEM.REX to the 
+   HLQ.PCRE2.CNTLLIB.
+4. Adjust the various JCL to point to the above libraries.  The JCL 
+   members contain // SET statements after the JOB statement.  Locate 
+   those that deal with the high level qualifiers and change them to 
+   your own.
+5. Run HLQ.PCRE2.JCLLIB(ADDMEM) to load zos.load into HLQ.PCRE2.SRCE.  
+   Loading zos.load is pretty slow process.  (see below a note for the 
+   usage of ADDMEM.)
+6. Run HLQ.PCRE2.JCLLIB(ADDCNTL) to load zos.lked & HLQ.PCRE2.CNTLLIB. 
+7. Run HLQ.PCRE.JCLLIB(ADDTEST) to load zos.test into HLQ.PCRE2.TESTLIB.
+8. Run HLQ.PCRE.JCLLIB(ADDCOB) to load zos.cob into HLQ.PCRE2.COB.
+9. Run HLQ.PCRE.JCLLIB(COMPCRE2) to compile and link the whole package.
+10. Run HLQ.PCRE.JCLLIB(ZCOBCL) to compile and link the PCOBDEMO, COBOL 
+   demo program.
+11. You may now modify and run HLQ.PCRE2.JCLLIB(TESTPCRE) to see test 
+   results.  Some of the run options are irrelevant for z/OS.  
+   Similarly, you may run HLQ.PCRE.JCLLIB(TESTPCOB) and 
+   HLQ.PCRE.JCLLIB(TESTDEMO), to see demo results in both COBOL and C.
+12. Run HLQ.PCRE2.JCLLIB(ADDASM) to load zos.asm & HLQ.PCRE2.ASM and
+   C14_MACRO.ieb to HLQ.C14.MACLIB.
+13. Run HLQ.PCRE2.JCLLIB(REXXPCRE) to compile the REXXPCRE module, 
+   which is the Rexx API.
+
+Note for loading ASCII text to EBCDIC environment, FTP parameters and 
+the usage of the ADDMEM utility with the TRANSLAT option:
+-----------------------------------------------------------------------
+The ADDMEM utility mimics simple IEBUPDTE ./ ADD operation for FB/VB 
+and whatever LRECL input/output on a z/OS/TSO environment.  This 
+utility is very limited in nature and there was no attempt to optimize 
+its operation.  The utility supports only the ./ ADD NAME=member 
+operation of IEBUPDTE.  It assumes that the output library is 
+pre-allocated and is the same format as the input file.  It intends to 
+support only RECFM=F|FB|V|VB.
+There are two reasons for this utility.  The fact that IEBUPDTE appears 
+not to support anything that is not RECFM=FB,LRECL=80 while this 
+package core programs are in RECFM=VB,LRECL=255, and the ASCII to 
+EBCDIC transformations.  There are other solutions for the first 
+problem including free programs on cbttape (file 182), however I did 
+not want to rely on any external package and I needed the TRANSLAT 
+option.
+Loading ASCII text into an EBCDIC environment could be challenging.  In 
+many cases you do not have any control on the codepage, no use of FTP 
+or other issues.  I for example, had to use the venerable IND$FILE with 
+whatever defaults set by the System Programmer to whom I had no access.  
+If you have access to FTP, you could try using something like:
+Sbdataconn=(ibm-1047,iso8859-1)
+or
+Sbdataconn=(ibm-037,iso8859-1)
+where the ibm-xxxx denotes your specific IBM codepage.  However this 
+may not resolve all the issues.
+The main issue I'd encountered was the fact that the C compiler on z/OS 
+assumes IBM-1047 while most installations use IBM-037.  Thus the 
+compiler appears to be using logical not instead of circumflex.  I 
+resolved it by adding the TRANSLAT option to the ADDMEM utility.  It is 
+used by changing the TRANSLAT DD from DUMMY to '*' and adding input 
+instructions like:
+'B0'X '5F'X
+'05'X '40'X
+/*
+These are instructions for ADDMEM to translate any, let's say x'B0' to 
+x'5F', etc.  In particular these are needed in order to change all 
+occurrences of the "circumflex" sign '^' (x'B0') with the IBM version 
+"logical not" sign '¬' (x'5F') which is what the IBM C compiler wants, 
+and the tab character (x'05') which the C compiler does not like, with 
+space (x'40').
+However, one could avoid the aforementioned translation for source 
+lines that are tagged with '<TAG> somewhere in the line.
+
+6. Usage
+--------
+This port is based on the PCRE2 library (see the beginning of the 
+document to determine exactly which version.)  A version of COBOL API 
+is provided.  Please refer to the table below for a list of available, 
+specifically unavailable and maybe available functionalities.
+1. Jit specific functions, were not and will not be available and not 
+  even mentioned.
+2. The functions may be available by their long, case sensitive name.  
+  These functions are available in C, providing that the 'Located in' 
+  module is bound.  These functions have the same signatures as 
+  described in PCRE2 documentation.  These names are also available in 
+  COBOL, providing that the using program is compiled with 
+  PGMNAME(LONGMIXED) compile option.
+2. In PCRE2 there is a short, upper case name alias for all functions.  
+  That name is available via the COBOL API module PCOBAPI2.  Those new 
+  names are mentioned immediately following the word 'same', with same 
+  signatures as described in PCRE2 documentation.
+3. VERY IMPORTANT - JIT functions are unavailable.  They might be 
+  available in the code but calling them would produce unpredictable 
+  results.  See below a discussion about JIT unavailability.  Thus, 
+  there might be source code members which are not compiled in the 
+  installation JCL.  Please do not attempt to compile or run any of
+  those pieces.
+4. Very important - Only tstin1, tstin11, tstin14 and tstin2 members in 
+  the original test suite are of any relevance, but be aware that all 
+  available test suites are ASCII oriented and your results will differ 
+  from the published PCRE2 results.
+4. I added some specialized EBCDIC oriented tests and their results 
+  (see discussion about the test suite.)
+6. The PCRE2 documentation discusses various forms of 'newline' 
+  processing.  For COBOL, all this is irrelevant as there is no such 
+  concept in COBOL.  In C a 'newline' (x'15') character is added and in 
+  text files (at least from the SYSIN [standard input]) the trailing 
+  spaces are chopped.  This is done internally by the C i/o and is not
+  controlled by PCRE2.
+7. JCL PARM= in C context adheres with C semantics, so in PCR2DEMO, if 
+  the pattern (or the subject) contains a backslash (\) it will be 
+  considered as an escape character.  If one actually wants a 
+  backslash, then double it (\\).  COBOL does not have this problem.
+8. Make sure that the library HLQ.PCRE2.LOADLIB appears in the correct
+  concatenation order in your runtime //STEPLIB DD and in bind 
+  (linkedit) time in //SYSLMOD DD.
+  Make sure that the HLQ.PCRE2.SRCE library appears in your 
+  //USERLIB DD or ahead of all other C libraries in //SYSLIB when 
+  compiling in C.
+  Make sure that HLQ.PCRE2.COB appears in //SYSLIB DD when compiling in 
+  COBOL.
+  Please add INCLUDE SYSLIB(PCOBAPI2) to the binder to use the short 
+  names.
+  Please add INCLUDE SYSLIB(PCRZFUNC) to the binder to use the pcrz 
+  functions if you are not including the PCOBAPI2 above.
+
+Function                                New name    Located in
+--------                                --------    ----------
+pcre2_compile                           COMPILE2    COMPILE2
+pcre2_code_free                         CODEFREE    COMPILE2
+pcre2_code_copy                         CODECOPY    COMPILE2    
+pcre2_code_copy_with_tables             CODECOPT    COMPILE2
+pcre2_match_data_create                 MATCHDCR    MATCHDA2
+pcre2_match_data_create_from_pattern    MATCDCFP    MATCHDA2
+pcre2_match                             MATCH2      MATCH2
+pcre2_dfa_match                         DFAMATC2    DFAMATC2
+pcre2_match_data_free                   MATCHDFR    MATCHDA2
+pcre2_get_mark                          GETMARK     MATCHDA2
+pcre2_get_ovector_count                 GETOVECN    MATCHDA2
+pcre2_get_ovector_pointer               GETOVEPT    MATCHDA2
+pcre2_get_startchar                     GETSTART    MATCHDA2
+pcre2_general_context_create            GENCNTCR    CONTEXT2
+pcre2_general_context_copy              GENCNTCP    CONTEXT2
+pcre2_general_context_free              GENCNTFR    CONTEXT2
+pcre2_compile_context_create            CMPCNTCR    CONTEXT2
+pcre2_compile_context_copy              CMPCNTCP    CONTEXT2
+pcre2_compile_context_free              CMPCNTFR    CONTEXT2
+pcre2_convert_context_copy				CNVCTXCP	CONTEXT2
+pcre2_convert_context_create			CNVCTXCR	CONTEXT2
+pcre2_convert_context_free				CNVCTXFR	CONTEXT2
+pcre2_set_bsr                           SETBSR      CONTEXT2
+pcre2_set_character_tables              SETCHRTB    CONTEXT2
+pcre2_set_newline                       SETNEWLN    CONTEXT2
+pcre2_set_parens_nest_limit             SETPRNLM    CONTEXT2
+pcre2_set_compile_extra_options			SETCEXOP	CONTEXT2
+pcre2_set_compile_recursion_guard       SETCMRCG    CONTEXT2
+pcre2_set_depth_limit					SETDEPLM	CONTEXT2
+pcre2_set_glob_escape					SETGLBES	CONTEXT2
+pcre2_set_glob_separator				SETGLBSP	CONTEXT2
+pcre2_set_heap_limit					SETHEPLM	CONTEXT2
+pcre2_match_context_create              MTCCNTCR    CONTEXT2
+pcre2_match_context_copy                MTCCNTCP    CONTEXT2
+pcre2_match_context_free                MTCCNTFR    CONTEXT2
+pcre2_set_callout                       SETCALOT    CONTEXT2
+pcre2_set_match_limit                   SETMTCLM    CONTEXT2
+pcre2_set_recursion_limit               SETRCNLM    CONTEXT2
+pcre2_set_offset_limit                  SETOFFLM    CONTEXT2
+pcre2_set_max_pattern_length            SETMXPLN    CONTEXT2
+pcre2_set_recursion_memory_management   SETRCNMM    CONTEXT2
+pcre2_converted_pattern_free			CNVPATFR	CONVERT2
+pcre2_pattern_convert					PATTCONV	CONVERT2
+pcre2_substring_copy_byname             SUBCPNAM    SUBSTRI2
+pcre2_substring_copy_bynumber           SUBCPNUM    SUBSTRI2
+pcre2_substring_free                    SUBSTFR     SUBSTRI2
+pcre2_substring_get_byname              SUBGTNAM    SUBSTRI2
+pcre2_substring_get_bynumber            SUBGTNUM    SUBSTRI2
+pcre2_substring_length_byname           SUBLNNAM    SUBSTRI2
+pcre2_substring_length_bynumber         SUBLNNUM    SUBSTRI2
+pcre2_substring_nametable_scan          SUBNMSCN    SUBSTRI2
+pcre2_substring_number_from_name        SUBNMFNM    SUBSTRI2
+pcre2_substring_list_free               SUBLSTFR    SUBSTRI2
+pcre2_substring_list_get                SUBLSTGT    SUBSTRI2
+pcre2_substitute                        SUBSTIT2    SUBSTIT2
+pcre2_jit_compile                       JITCOMP2    JITCOMP2
+pcre2_jit_match                         JITMATC2    JITMATC2
+pcre2_serialize_decode                  SERIADCD    SERIALI2
+pcre2_serialize_encode                  SERIAENC    SERIALI2
+pcre2_serialize_free                    SERIAFR     SERIALI2
+pcre2_serialize_get_number_of_codes     SERGTNMC    SERIALI2
+pcre2_get_error_message                 GETERROR    ERROR2
+pcre2_maketables                        MAKETAB2    MAKETAB2
+pcre2_pattern_info                      PATTERN2    PATTERN2
+pcre2_callout_enumerate                 CALOTENM    PATTERN2
+pcre2_config                            CONFIG2     CONFIG2
+free(***)                               FREEMAIN
+malloc(***)                             GETMAIN
+pcrz_what_term_str(*)                   ZWHTTRM     pcrzfunc
+pcrz_is_space_term_str(*)               ZISSPTRM    pcrzfunc
+pcrz_is_null_term_str(*)                ZISNLTRM    pcrzfunc
+pcrz_space_to_null_term_str(*)          ZSPC2NUL    pcrzfunc
+pcrz_null_to_space_term_str(*)          ZNUL2SPC    pcrzfunc
+regcomp{**)                             PREGCOMP    PC2POSIX
+regexec{**)                             PREGEXEC    PC2POSIX
+regerror{**)                            PREGERR     PC2POSIX
+regfree{**)                             PREGFREE    PC2POSIX
+
+(*) indicates supporting functionality, not available in the original 
+  PCRE2 package and was added to support the COBOL environment.
+{**) Posix - the old name must not be used.  See comments about the API
+  elsewhere in this document.
+(***) indicates that the new name is not implemented as a port, but as 
+  a new functionality, available in PCOBAPI2 only
+
+7. Calling the PCRE2 functions from COBOL
+-----------------------------------------
+I urge anyone who wants to interface between COBOL and C to read the 
+excellent Share paper "What is ILC and how to use it-COBOL, PL/I and 
+C/C++" by Mr. Tom Ross, Share Session 8239, August, 2003. The paper 
+could be found here:
+http://www-01.ibm.com/support/docview.wss?uid=swg27003846&aid=1
+I opted to use the pragma-less option and call the C modules in the 
+most native way because the C modules potentially, need to interact 
+with other C modules and not only with COBOL.  
+I assume that practically everybody working in z/OS nowadays uses 
+Enterprise COBOL version 3 and up and up and almost nobody would try to 
+retrofit older programs to use PCRE.  Thus, the assumption is that the 
+user may call any module using BY VALUE, BY REFERENCE and RETURNING 
+lauses in COBOL.  If there would be enough popular demand I may opt to 
+write a special COBOL API module that could be used without the 
+RETURNING clause.
+The most important point is that when C function parameter list 
+requires a pointer (char * variable), the preferred way to mention that 
+parameter would be to use a pointer rather then allow the parameter 
+list to implicitly provide that pointer.  Theoretically, one could use:
+CALL 'function' USING BY REFERENCE VARIABLE
+instead of:
+CALL 'function' USING BY VALUE SOMEPOINTER 
+where the pointer SOMEPOINTER points to VARIABLE, but if that variable 
+is the last in the parameter list, then, by z/OS calling sequence 
+convention the highest bit is on in the last reference of the parameter 
+list and this would cause issues with C's pointer arithmetic.
+Please refer to the PCOBDEM2 program, port of the pcr2demo.c for 
+examples of such calls.  The example herein is taken from that program
+    call 'COMPILE2' using                       
+         by value     pcrews-pattern-ptr        
+         BY VALUE     PCRE2-ZERO-TERMINATED     
+         BY VALUE 0                             
+         BY reference PCREWS-errornumber        
+         BY reference pcrews-erroroffset        
+         BY VALUE pcrews-null-ptr               
+         RETURNING PCREWS-RE-PTR                
+    end-call                                    
+The C definition of this module is:
+    pcre2_code *pcre2_compile(PCRE2_SPTR pattern, PCRE2_SIZE length,
+         uint32_t options, int *errorcode, PCRE2_SIZE *erroroffset,  
+         pcre2_compile_context *ccontext);                           
+* The C module pcre_compile has become COMPILE2.
+* The returned value of type pointer to type pcre2_code is mentioned in 
+  the RETURNING clause.  PCREWS-RE-PTR is defined in COBOL as USAGE 
+  POINTER.
+* The first parameter is of type pointer to a character string and is 
+  pointed to by pcrews-pattern-ptr, also defined as USAGE POINTER and 
+  is pointing to pcrews-pattern, a character string.
+* The next parameter is a constant of type integer is passed by value.
+* The next parameter of type integer is passed by value (0).
+* The next two parameters, pointers to integers demonstrate the ability 
+  to use BY REFERENCE and avoid a pointer.
+* The last parameter, a pointer to a character string is a passed by 
+  value as discussed above.  In that case, that pointer points nowhere 
+  (contains NULL value.
+
+8. COBOL copybooks
+-----------------------------
+Some of the publicly available C #include modules were ported, broken 
+and adapted to COBOL.  See the PCOBDEM2 programs for demonstration on 
+how to use some of them:
+PCRCMPCN - implementation of pcre2-compile-context. 
+PCRECAL2 - implementation of pcre2-callout-block and 
+   pcre2-callout-enumerate-block.
+PCRECODE - implementation of pcre2-code.
+PCREWS2  - useful working-storage section variables to be used by most
+   COBOL programs.
+PCRE2    - a port of the public header (pcre2.h).    
+PCRGENCN - implementation of pcre2-general-context.
+PCRECTXT - implementation of pcre2_convert_context
+PCRMECTL - implementation of pcre2-memctl.
+PCRMTCCN - implementation of pcre2-match-context.
+PCRMTCDA - implementation of pcre2-match-data.
+DUMPMEM  - a function, implemented as sub program, to dump memory for
+   test purposes.
+   
+9. Rexx API
+-----------
+REXXPCRE - REXX FUNCTION FOR PERL COMPATIBLE REGEX
+see the member HLQ.PCRE2.JCLLIB(REXXAPI) for a full description of  
+this function.
+
+ This program acts as a REXX function and is designed to be used
+ with the z/OS port of 'PCRE2 - Perl Compatible Regular Expressions'
+ which was created by Ze'ev Atlas.
+
+ This program was written by John Gateley in January 2017
+
+   INPUT ARGUMENTS
+      1, the PERL expression ending with x'00'
+      2, the string to be worked on ending with x'00'
+      3, a STEM name which will be populated with the output
+      4, an optional OPTION
+                     'g'  -  match all
+                     'i'  -  ignore case
+                     'x'  -  exclude white space
+		 This OPTION field provides means to supply the most common
+		 and most useful pattern modifiers.  Other, more esoteric,
+		 modifiers are not available in this version.
+      5, 'debug' if debugging required. Needs PCREDUMP DD name.
+
+    OUTPUT
+         if   successfull
+              RC=0    matched  - stem contains output
+              RC=1    no match - stem.0 will be '0'
+         else
+              RC='error message text'
+         endif
+
+    STEM variables output
+         stem.0             count of stem variables
+         stem.STRING.?      matched substrings
+         stem.POS.?         position and length of matches e.g. 3,4
+         stem.NAME.?        named substrings ' ' if none
+
+    DEBUGGING can be done by specifying 'debug' as argument 5.
+              You will also need to allocate the DD name PCREDUMP
+              with DISP=MOD if more than one call to REXXPCRE
+              because each call is a separate unit of work which
+              includes opening and closing the dataset.
+			  
+10. Support functions
+--------------------
+The functions described here do not use Reg Exp because Reg Exp is not 
+yet available.  They help to prepare COBOL fixed length character 
+strings for Reg Exp manipulation.  COBOL character strings are 
+fundamentally different from C (and thus also C++, Java, C# and 
+virtually any other language) character strings in that they are fixed 
+length or length terminated (i.e. the length of the string is known 
+either in compile time or in run time via some variable.)  That length 
+is retrievable by means of querying the prefix variable or using the 
+LENGTH OF special register.  There is no terminator character (null or
+otherwise.)  COBOL notion of fixed length or length terminated 
+character strings relates directly to the notion of fixed length 
+records - record length is pre-defined and known in similar manner and 
+there is no record terminator character.
+Most other languages use the null terminated notation (i.e. the 
+end-of-string is signaled by the null character.  Regular Expression as 
+defined and implemented by Perl, Posix and PCRE depend on the string 
+being null terminated.  To add to the complication, C on z/OS adds 
+record terminator to the end of the record even on fixed length 
+records, but on text records, at least from the standard input, the 
+last spaces are chopped.  I coined that type as space terminated 
+records and strings.  Enterprise COBOL supports PIC Z strings which are 
+essentialy null terminated strings.
+The functions herein provide the means to query a character string and 
+convert it to the desired format.  Note that to make a length 
+terminated string into null terminated one may use COBOL technique of 
+concatenating the sting with null:
+           STRING YOUR-LENGTH-TERMINATED_STRING, LOW-VALUE
+                  DELIMITED BY SIZE INTO YOUR-TARGET-STRING
+Currently, these functions compile only under NATIVE_ZOS as I suspect 
+that nobody else will want or need them, however, it is pretty simple 
+to remove this limitation.
+    
+int pcrz_what_term_str (char * str, int maxlen); - 
+  Examines the string str for max length of maxlen and returns -1 if it 
+  is a null terminated, -2 if space terminated and -3 if length 
+  terminated.
+int pcrz_is_space_term_str (char * str, int maxlen); - 
+  Examines the string str for max length of maxlen and returns -1 if it 
+  is a null terminated, -3 if length terminated and the actual 
+  significant length (i.e. sans the trailing spaces) if space 
+  terminated.
+int pcrz_is_null_term_str (char * str, int maxlen); -
+  Examines the string str for max length of maxlen and returns -2 if it 
+  is a space terminated, -3 if length terminated and the actual length 
+  if null terminated.
+int pcrz_space_to_null_term_str (char * str, int maxlen); -
+  Examines the string str for max length of maxlen.  If it is already 
+  null terminated, only the null terminated string part is examined 
+  farther.  The function looks for the last non-space character, marks 
+  the next character as null and returns the actual length of the null 
+  terminated string.  If the last non-space character is the last 
+  character (no room for null character, then the function will return 
+  -3 for length terminated.
+  Note: maxlen is one more then the null terminated string length to 
+  allow for the null terminator.
+int pcrz_null_to_space_term_str (char * str, int maxlen); -
+  Examines  the string str for max length of maxlen.  If it is null 
+  terminated, the null character and all characters after it to maxlen 
+  are replaced by spaces.  The function then looks for the last 
+  non-space character and returns the actual length of the space 
+  terminated string.  If the last non-space character is the last 
+  character, then the function will return -3 for length terminated.
+Note these two functions:
+void FREEMAIN (void* ptr);
+void * GETMAIN (size_t size); - GETMAIN and FREEMAIN are holdovers from 
+   PCRE.  The names were chosen because of the mainframe programmers 
+   familiarity with those names (as implemented in CICS) and because 
+   they are new development rather then an implementation of the PCRE 
+   functions (themselves meant as front ends for user implemented 
+   functionality.)  
+   GETMAIN and FREEMAIN are just front ends to the native C functions 
+   malloc and free.
+   
+11. GREP functionality
+----------------------
+GREP functionality is available through the pcr2grep module and is 
+working with added functionality not available in other OSes.  pcr2grep 
+for z/OS recognizes a PDS or PDSE as such and deal with it as if it was 
+a Unix directory.  All members are examined individually for the 
+searched pattern.  HFS and ZFS file systems are interpreted as they 
+should - as Unix file systems.
+For some reason the z/OS Language Environment (LE) runtime is prompting 
+for its own runtime options.  Put '/' in the beginning of the 
+PARM='/... field to signal to LE runtime that it is not supplied with 
+any options.
+Apparently, there is a difference in the way runtime options are 
+implemented in pcr2grep as opposing to, for example, pcr2test that does 
+not have this problem, but I have not yet find that difference.
+There is a TESTGREP JCL member to demonstrate usage of pcregrep.
+Note: #define NATIVE_ZOS_OFF 
+   Using this macro allows confining the effects of NATIVE_ZOS within 
+   the config.h so the rest of the program would compile without it.  
+   The main use of that is in PCR2GREP, if we want to ignore the 
+   effects of the z/OS specific file system and use it as pure Unix, or 
+   as a primitive OS if we also do not configure DEF(HAVE_SYS_STAT_H), 
+   DEF(HAVE_DIRENT_H) and DEF(HAVE_SYS_TYPES_H).
+Testing of the full GREP functionality in z/OS/EBCDIC environment is not 
+complete (as of 10.22.544.) I will try to complete it for later release.
+
+12. Why isn't JIT Supported
+---------------------------
+This is a quote from Philip's email to me:
+The JIT compiler compiles native machine code for the host it is 
+running on.  Zoltán has access to, and has provided code generators 
+for, several common non-mainframe architectures:
+
+  ARM v5, v7, and Thumb2
+  Intel x86 32-bit and 64-bit
+  MIPS 32-bit
+  Power PC 32-bit and 64-bit
+  SPARC 32-bit (experimental)
+
+Internally, the SLJIT compiler uses a generalized machine language that 
+combines the common elements of common architectures: this is then 
+refined for the actual architecture in use. I do not know whether it 
+would be possible to make it generate code for a mainframe, but that is 
+not really the point: the maintainer would have to have access to (and 
+familiarity with) a mainframe in order to implement it, and I very much 
+doubt that he has, or will ever have, this.
+------
+If any of you has the required expertise, you are welcome to join and
+contribute.  Until then, JIT is not supported.
+
+BTW, Philip was a mainframe programmer years ago and he still has no 
+intention to go for it :(
+
+13. POSIX API in PCRE2
+----------------------
+Support for the POSIX API in PCRE2 was never meant to support the regex 
+model of POSIX, just to provide the user with the familiar API, but 
+with the PCRE2 (Perl Compatibility) regex model.  In order to prevent 
+undue conflicts in the binding (linkedit) step, I've decided to change 
+the API by providing PCRE2 specific names for the four POSIX functions.  
+The user is advised, of course, never to use the regex.h header in 
+conjunction with PCRE2 in order to prevent conflict in compile time 
+(for C.)
+Users may, obviously, use the provided PCRE2 function names (and 
+include the POSIX module PC2POSIX in the binding step,) as is done 
+internally in PCRE2 for z/OS.  However to give the user the full beauty 
+of this functionality, the user may include the provided header file 
+PC2PSXAP.h (of four pragma map statements,) and continue to use the 
+native POSIX function names.  Remember that you need also the posixh.h 
+and the pcre2.h header files.  The provided IBMSAMPL.c program 
+demonstrates how to compile such programs with option to use either the 
+original POSIX functionality [UNDEF(COMPILE_WITH_PCRE2=1)] or the PCRE2 
+functionality [DEF(COMPILE_WITH_PCRE2=1)].  See the provided output 
+snippets below to demonstrate the difference.  For languages that do 
+not have pragma map or any equivalent, just use the PCRE2 function 
+names.
+Note that the provided API program, PCOBAPI2.c had a section that tried 
+to deal with the issue.  This section is now commented out and the 
+compile option UNDEF(NATIVE_ZOS_POSIX) does nothing.
+
+Output snippets
+---------------
++++ COMPILE WITH PCRE2 oneself                                           
+With the whole expression, a matched substring "oneself" is found at...
+With the sub-expression, a matched substring "self" is found at...
+
++++ COMPILE WITH POSIX oneselfsufficient                                  
+With the whole expression, a matched substring "oneselfsufficient"...
+With the sub-expression, a matched substring "selfsufficient" is... 
+ 
+14. Test Suite
+--------------
+1. While developing the test suite for EBCDIC we've corrected some bugs 
+   in the core PCRE2 regarding EBCDIC.  Only significant bugs and 
+   issues are mentioned.
+   1.1 \c is now behaving as described in the perlebcdic document.
+   1.2 \a and \e are translated across the board to 0x2f and 0x27 
+      rather than to the ASCII designations 0x07 and 0x1b.
+2. There are some differences in between ASCII and EBCDIC.
+   2.1 The aforementioned \c is limited to 32 characters only (see 
+      Perlebcdic).
+   2.2 The \h meta-character includes 0x09 (tab), 0x20 (space) and 0xa0 
+      (non-breaking space).  In EBCDIC \h now includes the parallel 
+      0x05 (tab), 0x40 (space) and 0x41 (non-breaking space).
+   2.3 The \R, \v meta-characters include 0x0a, 0x0b, 0x0c, 0x0d and 
+      0x85, which corresponds perfectly with the EBCDIC equivalents, 
+      0x0b, 0x0c, 0x0d, 0x15 and 0x25, but the latter misbehaves.  OTH 
+      most people would never use 0x25 for nothing so it is a moot 
+      issue.
+   2.4 Perl recognizes the [A-Z] and [a-z] as special cases that 
+      include the letters a-z and A-Z only, without the EBCDIC gaps.  
+      This is implemented in PCRE2 only.
+3. Test suites
+   In developing the EBCDIC test suite, I used this Methodology:
+   3.1 We are interested only in testinput1, testinput2, testinput15,
+      testinput16, testinput18, testinput20 and testinput21.  In the
+      past we wre interested partially in the oldtestinput11 and 
+      testinput14.
+   3.2 I Compared pcretest results from the provided standard test 
+      suite to the z/OS EBCDIC results (after converting to ASCII.)
+   3.3 I ignored all same results or where the differences were obvious 
+      (0x0a vs. 0x15, Caret vs. logical not) and where the EBCDIC 
+      results are matching correctly, if different.
+   3.4 For all remaining issues, I've developed a small test suite that 
+      either demonstrates how to code the pattern so that it would 
+      match, demonstrates significant point of difference, or overcome 
+      issues such as  different file name scheme (for saved regexes), 
+      etc.
+   3.5 The provided files are ASCII images of the actual EBCDIC files.  
+      The original EBCDIC files would be available on the EBCDIC 
+      distribution on the PCRE2.TESTLIB library.
+      TSTINE1 - derived from issues in testinput1.
+      TSTINE2 - derived from issues in testinput2.
+      TSTINE11 - derived from issues in testinput11.
+      TSTINE14 - derived from issues in testinput14.
+      TSTOTE1 - pcretest z/OS output for TSTINE1.
+      TSTOTE2 - pcretest z/OS output for TSTINE2.
+      TSTOTE11 - pcretest z/OS output for TSTINE11.
+      TSTOTE14 - pcretest z/OS output for TSTINE14.
+      All in addition to the existing :
+      TSTIN1 - EBCDIC for testinput1.
+      TSTIN2 - EBCDIC for testinput2.
+      TSTIN15 - EBCDIC for testinput15. 
+      TSTIN16 - EBCDIC for testinput16. 
+      TSTIN18 - EBCDIC for testinput18. 
+      TSTIN20 - EBCDIC for testinput20.
+      TSTIN21 - EBCDIC for testinput21.
+      TSTOT1 - EBCDIC images of the original (ASCII) test outputs.  
+      TSTOT2 
+      TSTOT15
+      TSTOT16
+      TSTOT18
+      TSTOT20
+      TSTOT21
+      TSTOO1 - EBCDIC test outputs from the PCRE2 for z/OS.  
+      TSTOO15 
+      TSTOO16 
+      TSTOO18 
+      TSTOO2  
+      TSTOO20 
+      TSTOO21 
+      Note: the output compiled patterns are not provided.  This 
+         decision may change if there is some popular demand :)
+      Note: TSTIN20 fails because it tries to save patterns Unix style.
+	     This facility is tested in TSTINE2/TSTOTE2.
+
+15. Excerpts from previous versions comments
+--------------------------------------------
+1. Posix compatibility is now available, but the routine names are NOT 
+   the standard Posix routine name to prevent any conflict.
+2. The COBOL library contains a COBOL module, REGEX1 that demonstrate 
+   how to use the standard IBM supplied Posix routines.  This module 
+   was adapted to COBOL by Mr. Frank Swarbrick and is published here 
+   with his permission.
+3. The C compiler options are supplied in the JCL via OPTFILE file.  
+   This allows of controlling user supplied compile time options by 
+   using something like DEF(SOME_DEFINITION) akin to -D in Unix.  Using 
+   this option reduced significantly the need to perform source code 
+   changes which might be tricky even if performed by an automated 
+   process.
+4. This version does not (yet) know how to take a pattern (wildcard) 
+   for filename or membername.
+5. While a few people have expressed interest in the PL/I interface and 
+   some tried to give me useful advice, I've found that with my limited 
+   time and resources, I cannot do it.  Hence, PL/I support is 
+   officially dropped and will not be renewed unless there would be a 
+   volunteer who is both capable in working with PL/I and its 
+   interfaces, and is ready to devote time for this project.
+6. Rexx seemed to me to be a perfect fit for PCRE.  It is analogous to 
+   Perl in the native z/OS ecosystem and is doing similar (though much 
+   more primitive) pattern matching.  However, the Rexx interface is 
+   extremely involved and working with it requires expertise that I do 
+   not posses and do not have the time to acquire, and that despite of 
+   useful advice from some people.  Hence, no Rexx support is planned 
+   unless there would be a volunteer who is both capable in working 
+   with Rexx and its interfaces, and is ready to devote time for this 
+   project.
+7. A message to users who choose to download from CBTTAPE:
+   You do not need the full installation package (which is in ASCII) if 
+   your installation is using IBM-037.  
+   Filexxx is a full version of the PCRE2 port, all in EBCDIC and 
+   PDS/E, intended to save the end user the hassle of uploading ASCII 
+   files while converting to EBCDIC and the hassle of creating the 
+   appropriate libraries.  Once you upload FILExxx.XMI (in binary 
+   mode),    perform the necessary 'RECEIVE' of the installation 
+   library and then    the RECEIVE for the various libraries, you have 
+   the full source code    and even the LOADLIB (if you use IBM-037).
+   If you want the ASCII version for whatever reason, you may download 
+   it from www.zaconsultants.net.
+------------
+16. Why separate POSIX routine names:
+-------------------------------------
+The build (compile and link or bind) on the mainframe is much more 
+primitive then what you have on either Unix/Linux or Windows.  I 
+created my own process that compiles the modules twice, first time 
+deliberately with no dependency resolution.  Then I take the compile 
+output (SYSOUT:) and analyze it to create dependency resolutions 
+based on 'missing' and 'found' names, before I compile to 
+completion.
+
+This works fine, but I forgot that the POSIX routine names are standard
+and thus available at the lowest level of  dependency resolution, 
+unless I integrate the PCRE library in the system available libraries 
+ahead of the standard run-time libraries, which I forgot to do (even 
+though I put a glaring warning in my own documentation months ago!)
+
+Judging from my own error, I assume that others would do it as well.  
+I decided to add the Posix routine names to those names that I change 
+anyway (upper case. 8 characters only, no underscore.)  I thus 
+separated the standard Posix routine from PCRE Posix routines names.  
+For the people and culture around z/OS, this is probably the best 
+solution.  This required basically changing few parameters in my data 
+(and very minor adjustment in a couple of scripts) and wasn't that 
+hard.

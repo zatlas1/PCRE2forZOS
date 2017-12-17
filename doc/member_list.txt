@@ -1,0 +1,55 @@
+members of ZATLAS1.PCRE2.SRCE - my additions
+--------------------------------------------
+CONFIG   [Created by merging with the supplied config.h]
+ECHO     [Addopted from OpenBSD]
+IBMSAMPL [Addapted from IBM code samples]
+PCOBAPI2 [Original code]
+PCRPRGMA [Created automatically]
+PCRZCONH [Original code]
+PCRZFUNC [Original code]
+PCRZOSCS [Original code]
+PCRZOSFS [Original code]
+PC2PSXAP [Original code]
+
+members of ZATLAS1.PCRE2.SRCE - original package
+------------------------------------------------
+AUTOPOS2 
+CHARTAB2 
+COMPILE2 
+CONFIG2  
+CONTEXT2 
+CONVERT2 
+DFAMATC2 
+DFTABLES 
+ERROR2   
+FINDBRA2 
+FUZZSUP2 
+INTERNA2 
+INTMODE2 
+JITCOMP2 
+JITMATC2 
+JITMISC2 
+JITTEST2 
+MAKETAB2 
+MATCHDA2 
+MATCH2   
+NEWLINE2 
+ORD2UTF2 
+PATTERN2 
+PCRE2    
+PCR2DEMO 
+PCR2GREP 
+PCR2TEST 
+PC2POSIX 
+POSIXH  
+PRINTIN2
+SERIALI2
+STRINGU2
+STUDY2  
+SUBSTIT2
+SUBSTRI2
+TABLES2 
+UCD2    
+UCP2    
+VALIDUT2
+XCLASS2 
