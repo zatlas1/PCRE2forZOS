@@ -99,8 +99,8 @@ on those as well.
 int ZCSINIT (ZCSSTRCT ** handle_ptr,        /* returned handle */  
                       char * codeset_name,  /* input codeset name 
                                                e.g. IBM-037 
-											   or NULL if locale 
-											   codeset is to be used */    
+					       or NULL if locale 
+					       codeset is to be used */    
                       size_t codeset_name_size, /* codeset name size -
                                                actual size or any of:
                                                -1 for null terminated
@@ -108,10 +108,10 @@ int ZCSINIT (ZCSSTRCT ** handle_ptr,        /* returned handle */
                                                */
                       size_t pattern_size,  /* maximum anticipated 
                                                regex size 
-											   or 0 for default */		
+					       or 0 for default */		
                       size_t subject_size); /* maximum anticipated
                                                subject string size 
-											   or 0 for default */
+					       or 0 for default */
                                     
 1. Determines the native (or use supplied) input CODESET.  If a codeset 
    name is not supplied (NULL), the function will use the locale 
@@ -143,7 +143,7 @@ int ZCSCONVP (ZCSSTRCT *zcsstrct_ptr,      /* handle returned from
 		                                      terminated string */       
          char ** output_pattern,           /* handle for converted 
 		                                      regex to be supplied to 
-											  PCRE2 compile function */
+						      PCRE2 compile function */
 		 size_t ** out_pattern_length);    /* converted regex size */ 
 /*  pcrz_codeset_convert_subject <=> ZCSCONVS */                  
 int ZCSCONVS (ZCSSTRCT *zcsstrct_ptr,      /* handle returned from
@@ -152,11 +152,11 @@ int ZCSCONVS (ZCSSTRCT *zcsstrct_ptr,      /* handle returned from
 		                                      string */ 
 		 size_t subject_length,            /* subject string size or 0 
 		                                      for nullterminated 
-											  string */
+						      string */
          char ** output_subject,           /* handle for converted 
 		                                      subject string to be  
-											  supplied to PCRE2 execute 
-											  function */ 
+						      supplied to PCRE2 execute 
+						      function */ 
 		 size_t ** out_subject_length);    /* converted subject string 
 		                                      size */ 
                         
