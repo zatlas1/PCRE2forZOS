@@ -23,12 +23,20 @@ try to provide the ASCII version with proper instructions how to load that
 into EBCDIC.  This is meant basically as a backup for the EBCDIC installation
 package on the CBTTAPE.
 
+This GitHub site does not contain any of the original dource code or any 
+other component of the original.  Those materials are available as was 
+mentioned above in https://github.com/luvit/pcre2.  If you examine the 
+original, you will find in few places, some refernce to 'NATIVE_ZOS'.  _Those 
+references were added to the original code on my request to help accomodate 
+this port.  The most invasive intervention in the original code is pcre2grep 
+to accomodate z/OS file types that do not exist in other environments.
+
 As I learn more about GIT, I will see if I can provide the whole thing here.
 
 Contributing and help resources:
 --------------------------------
 PCRE2 is managed by Phil Hazel (University of Cambridge) and Zoltán Hherczeg
-(University of Szeged _hungary).  Any contribution to the original as well as
+(University of Szeged, Hungary).  Any contribution to the original as well as
 requests for help and bug reports should be coordinated with them via 
 pcre-dev@exim.org.
 If you wish to contribute to the z/OS port or have a PCRE2 for z/OS specific 
